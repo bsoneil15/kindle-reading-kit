@@ -6,6 +6,10 @@ guides, and an unmistakable black focal mark with bold direct labels. The four
 original alternatives remain selectable. No personal details, network calls,
 accounts, proprietary fonts, repository setup or email delivery are required.
 
+![Editorial Soft preview: six chart forms (line, ranked bar, slope, sparkline table, small multiples, observed range) on fictional data, each with one bold black focal series and thin gray context](assets/preview-editorial-soft.svg)
+
+*Editorial Soft, the default style, on fictional example data. Vector preview of the 1236 px grayscale chart PNGs the kit renders for a 6.8-inch Paperwhite.*
+
 ## Quick start
 Python 3.10+ recommended. From this folder:
 
@@ -36,6 +40,7 @@ preview helper replaces that directory. Inspect all generated `sheet_*.png`.
 - `examples/data.json`: **fictional** 2025 regional shipments in thousands;
   identical data across all forms and options. `render_charts.py` is the plotting
   example; `build_sample.py` builds a short EPUB and a six-chart contact sheet.
+- `assets/preview-editorial-soft.svg`: README preview rendered from the fictional example data.
 - `tests/test_styles.py`: all five styles × six forms, input checks, restoration.
 
 ## Design contract
@@ -63,6 +68,6 @@ own licenses; no external typeface is bundled (Matplotlib resolves DejaVu).
 A simulated preview cannot guarantee physical e-ink legibility or Amazon's
 conversion. Recheck on target hardware after conversion. This project only
 creates local files; sending and publishing are separate, explicitly authorized
-steps. Draft status: not published and no repository created.
+steps.
 
 License: MIT; see `LICENSE`.
