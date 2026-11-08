@@ -22,6 +22,11 @@ E-ink constants (why):
                     Paperwhite page (1648/1236 = 1.33) so the reader never shrinks it to fit.
   MAX_BARS 8, MAX_LINES 4   more than that is a table -> use text_fallback().
 Fonts: DejaVu Sans, which ships inside matplotlib (no system font dependency).
+
+Optional keyword style= on the chart functions applies one eink_style preset for
+that call and restores module globals afterward. Omit it to keep the current
+globals, including an enclosing style() block. Pass grid= explicitly to override
+the preset's guides on line_chart.
 """
 import os, re, html, textwrap, warnings
 import matplotlib; matplotlib.use("Agg")
@@ -51,6 +56,13 @@ plt.rcParams.update({"font.family": FONT, "font.size": LABEL_PT, "text.color": B
     "axes.linewidth": LW_MIN, "xtick.major.width": LW_MIN, "ytick.major.width": LW_MIN,
     "xtick.labelsize": MIN_PT, "ytick.labelsize": MIN_PT, "text.parse_math": False})  # "$150K" stays literal
 DARK_TXT = "#333333"  # snaps to DARK (85) after quantization; used only for secondary text
+_OMIT = object()
+
+def _styled(style_key, call):
+    """Run call(design) inside one style preset, then restore module globals."""
+    from eink_style import style as style_ctx
+    with style_ctx(style_key) as design:
+        return call(design)
 
 _R = RendererAgg(10, 10, DPI)
 def text_w(s, size, bold=False):
@@ -177,9 +189,12 @@ def _spread(ys, gap, lo=None, hi=None):
     return {k: p for (_, k), p in zip(ys, pos)}
 
 # ---------------------------------------------------------------- 1. original stacked bars (compatible)
-def stacked_label_bars(rows, title, sub, name, fmt, xmax, source=None):
+def stacked_label_bars(rows, title, sub, name, fmt, xmax, source=None, style=None):
     """rows: (label, sublabel_or_"", value, highlight_bool). Left column labels, bar + value on the right.
     Kept for old build scripts; prefer hbar() for new charts."""
+    if style is not None:
+        return _styled(style, lambda _design: stacked_label_bars(
+            rows, title, sub, name, fmt, xmax, source=source, style=None))
     if len(rows) > MAX_BARS: raise ValueError("max %d bars; use text_fallback() for the rest" % MAX_BARS)
     if not source: warnings.warn("stacked_label_bars without source=: add a 'Source: ...' line")
     n = len(rows); rh = 0.56
@@ -207,9 +222,13 @@ def stacked_label_bars(rows, title, sub, name, fmt, xmax, source=None):
     return _result("bars", path, title, sub, source, [(r[0] + (" (%s)" % r[1] if r[1] else ""), r[2], r[3]) for r in rows], fmt)
 
 # ---------------------------------------------------------------- 2. horizontal bars
-def hbar(data, title, sub, name, source=None, fmt=None, highlight=None, sort=True, xmax=None):
+def hbar(data, title, sub, name, source=None, fmt=None, highlight=None, sort=True, xmax=None, style=None):
     """data: [(label, value), ...] or {label: value}. highlight: label, index or list of them (black + bold).
     Label sits above each bar (full width, long labels OK); value at the bar end. Sorted desc unless sort=False."""
+    if style is not None:
+        return _styled(style, lambda _design: hbar(
+            data, title, sub, name, source=source, fmt=fmt, highlight=highlight,
+            sort=sort, xmax=xmax, style=None))
     _need_source(source); fmt = fmt or _fmt
     data = list(data.items()) if isinstance(data, dict) else [tuple(d[:2]) for d in data]
     if len(data) > MAX_BARS: raise ValueError("max %d bars; chart the top %d and text_fallback() the rest" % (MAX_BARS, MAX_BARS))
@@ -235,9 +254,17 @@ def hbar(data, title, sub, name, source=None, fmt=None, highlight=None, sort=Tru
     return _result("bars", path, title, sub, source, [(l, v, l in hi) for l, v in data], fmt)
 
 # ---------------------------------------------------------------- 3. line chart
-def line_chart(x, series, title, sub, name, source=None, fmt=None, highlight=None, xticks=None, ylim=None, grid=True):
+def line_chart(x, series, title, sub, name, source=None, fmt=None, highlight=None, xticks=None, ylim=None, grid=_OMIT, style=None):
     """x: list of x labels/values; series: {name: [values]} (<= 4). highlight: series name (black, thick, solid).
     Others: thinner gray AND a distinct dash pattern (dash / dot / dash-dot). Direct end labels, no legend."""
+    if style is not None:
+        def _again(design):
+            use_grid = design["grid"] if grid is _OMIT else grid
+            return line_chart(x, series, title, sub, name, source=source, fmt=fmt, highlight=highlight,
+                              xticks=xticks, ylim=ylim, grid=use_grid, style=None)
+        return _styled(style, _again)
+    if grid is _OMIT:
+        grid = True
     _need_source(source); fmt = fmt or _fmt
     if len(series) > MAX_LINES: raise ValueError("max %d lines per chart; split into small multiples" % MAX_LINES)
     names = list(series); hi = _hiset(names, highlight if highlight is not None else names[0])
@@ -281,8 +308,12 @@ def line_chart(x, series, title, sub, name, source=None, fmt=None, highlight=Non
     return _result("lines", path, title, sub, source, dict(x=list(x), series={k: list(v) for k, v in series.items()}, highlight=sorted(hi)), fmt)
 
 # ---------------------------------------------------------------- 4. slope chart
-def slope_chart(rows, title, sub, name, source=None, fmt=None, highlight=None, left_label="Before", right_label="After"):
+def slope_chart(rows, title, sub, name, source=None, fmt=None, highlight=None, left_label="Before", right_label="After", style=None):
     """rows: [(label, before, after), ...] (<= 8). Highlighted rows: black thick line + bold label; others gray dashed."""
+    if style is not None:
+        return _styled(style, lambda _design: slope_chart(
+            rows, title, sub, name, source=source, fmt=fmt, highlight=highlight,
+            left_label=left_label, right_label=right_label, style=None))
     _need_source(source); fmt = fmt or _fmt
     if len(rows) > MAX_BARS: raise ValueError("max %d rows per slope chart" % MAX_BARS)
     hi = _hiset([r[0] for r in rows], highlight)
@@ -326,9 +357,13 @@ def slope_chart(rows, title, sub, name, source=None, fmt=None, highlight=None, l
                    left=left_label, right=right_label), fmt)
 
 # ---------------------------------------------------------------- 5. dot / range plot
-def dot_range(rows, title, sub, name, source=None, fmt=None, highlight=None, sort=True, point_label=None):
+def dot_range(rows, title, sub, name, source=None, fmt=None, highlight=None, sort=True, point_label=None, style=None):
     """rows: [(label, low, high), ...] or (label, low, high, point). Thick range bar with end dots, values at ends,
     optional point marker (e.g. median) as a white-filled ring. Sorted by high desc unless sort=False."""
+    if style is not None:
+        return _styled(style, lambda _design: dot_range(
+            rows, title, sub, name, source=source, fmt=fmt, highlight=highlight,
+            sort=sort, point_label=point_label, style=None))
     _need_source(source); fmt = fmt or _fmt
     if len(rows) > MAX_BARS: raise ValueError("max %d rows per range plot" % MAX_BARS)
     rows = [tuple(r) + (None,) * (4 - len(r)) for r in rows]
@@ -361,8 +396,11 @@ def dot_range(rows, title, sub, name, source=None, fmt=None, highlight=None, sor
     return _result("range", path, title, sub, source, dict(rows=rows, highlight=sorted(hi), point_label=point_label), fmt)
 
 # ---------------------------------------------------------------- 6. big-number callout
-def callout_card(number, context, name, source=None, title=None, sub=None):
+def callout_card(number, context, name, source=None, title=None, sub=None, style=None):
     """One key stat as an image: optional action title, the number huge and black, one line of context."""
+    if style is not None:
+        return _styled(style, lambda _design: callout_card(
+            number, context, name, source=source, title=title, sub=sub, style=None))
     _need_source(source)
     fr = _Frame(2.0, title, sub, source); ax = fr.ax; ax.axis("off"); ax.set_xlim(0, fr.ax_w); ax.set_ylim(0, fr.body_h)
     size = BIG_PT

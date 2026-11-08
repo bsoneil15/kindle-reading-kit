@@ -1,6 +1,3 @@
+# Core chart render. Packaging and preview extras are requirements-optional.txt.
 matplotlib>=3.8,<4
 Pillow>=10,<13
-beautifulsoup4>=4.12,<5
-lxml>=5,<7
-weasyprint>=62,<70
-pypdf>=4,<7

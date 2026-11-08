@@ -1,9 +1,12 @@
 """E-ink styles and compact chart forms. No network or account dependencies.
 
-Use `with style("editorial-soft"):` around kindle_charts calls. Sequential only:
-the context temporarily sets module globals and always restores them.
+Use `with style("editorial-soft"):` around kindle_charts calls, or pass
+style="editorial-soft" into a chart function. The context assigns module globals
+for the duration and restores them afterward. Same-thread nesting restores
+inside out. A second thread raises RuntimeError.
 """
 from contextlib import contextmanager
+import threading
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
@@ -22,58 +25,68 @@ STYLES = {
                                 title=13, hi=3.4, context=2.0, rule=True, grid=True),
 }
 _ACTIVE = STYLES['editorial-soft']
+_STYLE_LOCK = threading.RLock()
 
 @contextmanager
 def style(key='editorial-soft'):
     """Every option preserves black + heavy + bold emphasis on the key data."""
     global _ACTIVE
+    if key not in STYLES:
+        raise ValueError("unknown style %r; choose from %s" % (key, ", ".join(STYLES)))
+    if not _STYLE_LOCK.acquire(blocking=False):
+        raise RuntimeError("style() changes kindle_charts globals and is not thread-safe; "
+                           "run style contexts sequentially on one thread")
     config = STYLES[key]
     previous = _ACTIVE
     keys = ['FONT','TITLE_PT','LW_HI','LW_MUTED','LW_GRID','LIGHT']
     saved = {k: getattr(kit, k) for k in keys}
     original_finish = kit.finish
-    _ACTIVE = config
-    kit.FONT = config['font']; kit.TITLE_PT = config['title']
-    kit.LW_HI = config['hi']; kit.LW_MUTED = config['context']
-    kit.LW_GRID = 1.5; kit.LIGHT = '#DDDDDD'
-    def finish(fig, name, tight=False):
-        # End dots and stroke caps must not be clipped by plot boundaries.
-        for ax in fig.axes:
-            for line in ax.lines:
-                line.set_clip_on(False)
-        if key == 'tufte-minimal':
-            fig.lines.clear()  # remove footer rule, retain the actual source text
-        if config['rule']:
-            fig.lines.append(Line2D([.015,.985],[.995,.995],
-                             transform=fig.transFigure, color='black', lw=1.5))
-        if key == 'pattern-texture':
+    try:
+        _ACTIVE = config
+        kit.FONT = config['font']; kit.TITLE_PT = config['title']
+        kit.LW_HI = config['hi']; kit.LW_MUTED = config['context']
+        kit.LW_GRID = 1.5; kit.LIGHT = '#DDDDDD'
+        def finish(fig, chart_name, tight=False):
+            # End dots and stroke caps must not be clipped by plot boundaries.
             for ax in fig.axes:
-                for i, patch in enumerate(ax.patches):
-                    if isinstance(patch, Rectangle):
-                        is_key = sum(patch.get_facecolor()[:3]) < .1
-                        patch.set_facecolor('black' if is_key else 'white')
-                        patch.set_edgecolor('black'); patch.set_linewidth(1.5)
-                        if not is_key: patch.set_hatch(['//','..','xx'][i % 3])
-                j = 0
                 for line in ax.lines:
-                    # Data lines, not horizontal guides, with redundant identity.
-                    x, y = list(line.get_xdata()), list(line.get_ydata())
-                    if len(x) >= 2 and len(set(x)) > 1 and len(set(y)) > 1:
-                        is_key = line.get_linewidth() >= config['hi']
-                        line.set_color('black')
-                        line.set_marker('o' if is_key else ['s','^','D'][j % 3])
-                        line.set_markersize(5); line.set_markeredgewidth(1.5)
-                        line.set_markerfacecolor('black' if is_key else 'white')
-                        if not is_key: j += 1
-        return original_finish(fig, name, tight)
-    kit.finish = finish
-    with plt.rc_context({'font.family': config['font'], 'hatch.linewidth': 1.5}):
-        try:
+                    line.set_clip_on(False)
+            if key == 'tufte-minimal':
+                fig.lines.clear()  # remove footer rule, retain the actual source text
+            if config['rule']:
+                fig.lines.append(Line2D([.015,.985],[.995,.995],
+                                 transform=fig.transFigure, color='black', lw=1.5))
+            if key == 'pattern-texture':
+                for ax in fig.axes:
+                    for i, patch in enumerate(ax.patches):
+                        if isinstance(patch, Rectangle):
+                            is_key = sum(patch.get_facecolor()[:3]) < .1
+                            patch.set_facecolor('black' if is_key else 'white')
+                            patch.set_edgecolor('black'); patch.set_linewidth(1.5)
+                            if not is_key: patch.set_hatch(['//','..','xx'][i % 3])
+                    j = 0
+                    for line in ax.lines:
+                        # Data lines, not horizontal guides, with redundant identity.
+                        x, y = list(line.get_xdata()), list(line.get_ydata())
+                        if len(x) >= 2 and len(set(x)) > 1 and len(set(y)) > 1:
+                            is_key = line.get_linewidth() >= config['hi']
+                            line.set_color('black')
+                            line.set_marker('o' if is_key else ['s','^','D'][j % 3])
+                            line.set_markersize(5); line.set_markeredgewidth(1.5)
+                            line.set_markerfacecolor('black' if is_key else 'white')
+                            if not is_key: j += 1
+            return original_finish(fig, chart_name, tight)
+        kit.finish = finish
+        with plt.rc_context({'font.family': config['font'], 'hatch.linewidth': 1.5}):
             yield config
-        finally:
-            kit.finish = original_finish
-            for k, value in saved.items(): setattr(kit, k, value)
-            _ACTIVE = previous
+    finally:
+        kit.finish = original_finish
+        for attr, value in saved.items():
+            setattr(kit, attr, value)
+        _ACTIVE = previous
+        _STYLE_LOCK.release()
+
+_style_context = style
 
 
 def _validate_series(x, series, highlight):
@@ -86,12 +99,16 @@ def _validate_series(x, series, highlight):
 
 
 def compact_trends(x, series, title, sub, name, source, highlight,
-                   ylim=(0,100), small_multiples=False):
+                   ylim=(0,100), small_multiples=False, style=None):
     """Aligned sparkline table or stacked small multiples, shared scales.
 
     Rows preserve input order. One series is black/heavy; others gray/dashed.
     This is a chart image, never an HTML table. A result dict retains all data.
     """
+    if style is not None:
+        with _style_context(style):
+            return compact_trends(x, series, title, sub, name, source, highlight,
+                                  ylim=ylim, small_multiples=small_multiples, style=None)
     kit._need_source(source); _validate_series(x, series, highlight)
     if ylim[1] <= ylim[0] or any(not ylim[0] <= v <= ylim[1]
                                   for values in series.values() for v in values):

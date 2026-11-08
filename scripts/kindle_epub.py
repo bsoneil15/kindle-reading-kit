@@ -1,7 +1,11 @@
 """Kindle EPUB toolkit: e-ink CSS, per-section tap-to-open source notes, print-HTML -> Kindle-HTML
 transform (tables -> stacked records, figures swapped or dropped), EPUB3 + NCX packaging, cover art.
 
-Import from a build script:  sys.path.insert(0, "<skill>/scripts"); from kindle_epub import *
+Import from a build script (do not depend on the current directory):
+  from pathlib import Path
+  import sys
+  sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+  from kindle_epub import *
 Call set_sources({key: (label, url)}) once if content uses [[key]] citation markers.
 """
 import re, html, uuid, zipfile, datetime, sys, os

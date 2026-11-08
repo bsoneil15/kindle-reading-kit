@@ -1,0 +1,7 @@
+# Optional. Install when the environment allows it.
+# EPUB build (kindle_epub.py) and check_epub.py:
+beautifulsoup4>=4.12,<5
+lxml>=5,<7
+# preview_kindle.py. Also needs Poppler's pdftoppm on PATH (not a pip package):
+weasyprint>=62,<70
+pypdf>=4,<7
