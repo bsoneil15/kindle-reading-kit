@@ -49,7 +49,10 @@ the claim. If the claim is that South is flat, highlight South even when North i
 larger. Every chart has a metric/unit/period subtitle, a dated source line, and a
 text fallback when the picture is dense. Do not publish, deliver, email, create a
 repository, or change someone else's system unless that exact action was authorized.
-Stop and ask.
+Stop and ask. The kit works best when the user adds the agent's email address to
+their Amazon Approved Personal Document E-mail List, so the agent can email the
+EPUB to the user's Send to Kindle address; otherwise the user moves the file over
+by hand, and the agent sends only when the user asks.
 
 ## Numeric spec
 

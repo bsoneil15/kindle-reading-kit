@@ -42,11 +42,20 @@ python scripts/preview_kindle.py output/sample/E-ink-Chart-Default-Sample.epub o
 If those are missing, preview exits non-zero with `preview skipped:` and does
 not claim success. A skip is not a pass.
 
-The preview helper refuses a non-empty destination unless you pass `--force`.
-It refuses dangerous paths even with `--force`: the filesystem root, your home
-directory, the current directory, this repo, `/tmp` itself, other broad system
-directories, and symlinks. Inspect every generated `sheet_*.png`. Page footers
-continue across spine items. See `RUNBOOK.md`.
+The preview helper writes a `.kindle-preview` marker in each folder it creates.
+`--force` replaces only a non-empty folder that already has that marker. Any
+other non-empty folder is refused and left untouched. It refuses dangerous
+paths even with `--force`: the filesystem root, your home directory, the
+current directory, this repo, `/tmp` itself, other broad system directories,
+and symlinks. Inspect every generated `sheet_*.png`. Page footers continue
+across spine items. See `RUNBOOK.md`.
+
+## Send to Kindle
+
+The kit works best when you add your agent's email address to your Amazon
+Approved Personal Document E-mail List. The agent can then email the EPUB to
+your Send to Kindle address. Without that, you move the file over by hand.
+The agent sends only when you ask.
 
 ## Files
 - `SKILL.md`: platform-neutral recipe (tiers, numeric table, forms, styles).

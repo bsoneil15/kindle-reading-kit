@@ -4,10 +4,12 @@ Usage:
   python3 preview_kindle.py book.epub outdir
   python3 preview_kindle.py book.epub outdir --force
 
-Refuses a non-empty outdir unless --force is set. Refuses dangerous paths
-(filesystem root, home, cwd, this repo, /tmp, other broad directories, symlinks)
-even when --force is set. Missing WeasyPrint, Pillow, pypdf, or pdftoppm prints
-"preview skipped" and exits 2. A skip is not a pass.
+Writes a .kindle-preview marker in outdirs it creates. --force replaces only a
+non-empty outdir that has that marker. Any other non-empty outdir is refused
+and left untouched. Refuses dangerous paths (filesystem root, home, cwd, this
+repo, /tmp, other broad directories, symlinks) even when --force is set.
+Missing WeasyPrint, Pillow, pypdf, or pdftoppm prints "preview skipped" and
+exits 2. A skip is not a pass.
 
 The package path comes from META-INF/container.xml. Each spine item is rendered
 separately. The footer counter continues across items (WeasyPrint 69:
@@ -42,6 +44,8 @@ _BROAD = (
     "/lib", "/lib64", "/boot", "/proc", "/sys", "/dev", "/root", "/workspace",
     "/private", "/private/tmp", "/Users",
 )
+# Present only in folders this script created (or an empty folder it adopted).
+PREVIEW_MARKER = ".kindle-preview"
 
 
 def _contains(parent, child):
@@ -136,17 +140,45 @@ def _safe_extract(zf, dest):
         zf.extract(info, dest)
 
 
+def _marker_path(outdir):
+    return Path(outdir) / PREVIEW_MARKER
+
+
+def _script_created_preview(outdir):
+    """True when outdir contains the regular marker file this script writes."""
+    marker = _marker_path(outdir)
+    return marker.is_file() and not marker.is_symlink()
+
+
+def _mark_preview_dir(outdir):
+    _marker_path(outdir).write_text("kindle-reading-kit preview output\n")
+
+
 def _prepare_outdir(outdir, force):
+    """Create outdir, or replace it only when this script created it and force is set.
+
+    A non-empty folder without the marker is refused. Nothing in that folder is deleted.
+    """
+    outdir = Path(outdir)
     if outdir.exists() and not outdir.is_dir():
         raise ValueError("refusing preview path because it is a file: %s. Nothing was deleted." % outdir)
     if outdir.exists():
         entries = list(outdir.iterdir())
-        if entries and not force:
-            raise ValueError("refusing to replace non-empty directory %s. "
-                             "Pass --force to replace it. Nothing was deleted." % outdir)
         if entries:
+            if not _script_created_preview(outdir):
+                raise ValueError(
+                    "refusing to replace non-empty directory %s. "
+                    "It has no .kindle-preview marker, so this script did not create it. "
+                    "--force only replaces a preview folder this script created. "
+                    "Nothing was deleted." % outdir)
+            if not force:
+                raise ValueError(
+                    "refusing to replace non-empty directory %s. "
+                    "Pass --force to replace a preview folder this script created. "
+                    "Nothing was deleted." % outdir)
             shutil.rmtree(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
+    _mark_preview_dir(outdir)
 
 
 def _section_css(start_page):
@@ -212,7 +244,9 @@ def main(argv=None):
     parser.add_argument("epub", type=Path)
     parser.add_argument("outdir", type=Path)
     parser.add_argument("--force", action="store_true",
-                        help="replace a non-empty outdir; does not override a dangerous path")
+                        help="replace a non-empty outdir this script created "
+                             "(it has a .kindle-preview marker); "
+                             "does not override a dangerous path or an unrelated folder")
     args = parser.parse_args(argv)
     reason = dangerous_output_reason(args.outdir)
     if reason:
