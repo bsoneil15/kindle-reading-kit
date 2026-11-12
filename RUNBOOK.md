@@ -51,7 +51,8 @@ assert not kc.check_png(chart["path"])
 You can pass `style="editorial-soft"` into `line_chart`, `hbar`, `slope_chart`,
 `dot_range`, `callout_card`, `stacked_label_bars`, `sparkline_table`, and
 `small_multiples` instead of the `with` block. If you omit `grid` on
-`line_chart` while passing `style=`, the preset's grid flag is used.
+`line_chart`, the active style's grid flag is used, including inside
+`with style(...)`. An explicit `grid=` still wins.
 
 `style()` assigns `kindle_charts` module globals and swaps `finish` for the
 duration, then restores them. Nesting on the same thread restores inside out.
@@ -91,8 +92,10 @@ python scripts/preview_kindle.py path/to/book.epub output/preview
 python scripts/preview_kindle.py path/to/book.epub output/preview --force
 ```
 
-The script refuses a non-empty destination unless `--force` is present. `--force`
-does not override a dangerous path. Refused paths include the filesystem root,
+The script writes a `.kindle-preview` marker when it creates the destination.
+`--force` replaces only a non-empty folder that has that marker. A non-empty
+folder without the marker is refused and left untouched. `--force` does not
+override a dangerous path. Refused paths include the filesystem root,
 the home directory, the current directory, this repo, `/tmp` itself, and other
 broad system directories, including ancestors of the repo, home, or current
 directory. A symlink destination is refused. The destination must not contain
@@ -109,6 +112,13 @@ a 758 px downscale (`kindle_charts.downscale`). Look for clipped labels, orphane
 headings, split charts, tiny sources, and broken links.
 
 Previews are simulated. They are not a physical-device test.
+
+## Send to Kindle
+
+The kit works best when the user adds the agent's email address to their Amazon
+Approved Personal Document E-mail List. Then you can email the EPUB to the user's
+Send to Kindle address. Without that, the user moves the file over by hand.
+Stop before sending. Send only when the user asks.
 
 ## Devices
 

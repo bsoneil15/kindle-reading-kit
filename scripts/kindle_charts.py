@@ -25,8 +25,8 @@ Fonts: DejaVu Sans, which ships inside matplotlib (no system font dependency).
 
 Optional keyword style= on the chart functions applies one eink_style preset for
 that call and restores module globals afterward. Omit it to keep the current
-globals, including an enclosing style() block. Pass grid= explicitly to override
-the preset's guides on line_chart.
+globals, including an enclosing style() block. Omit grid= on line_chart to use
+the active style's grid flag. Pass grid= explicitly to override it.
 """
 import os, re, html, textwrap, warnings
 import matplotlib; matplotlib.use("Agg")
@@ -167,9 +167,25 @@ def _fmt(v): return ("%.1f" % v).rstrip("0").rstrip(".") if isinstance(v, float)
 def _need_source(source):
     if not source: raise ValueError("source= is required: every chart ends with a source line (e.g. 'Source: X, 2026')")
 def _hiset(labels, highlight):
+    """Focal labels. An int is a label when that int is one of the labels (a year such as 2025).
+
+    It is a position only when no label equals it. Anything that is neither a label
+    nor a valid position raises ValueError.
+    """
     if highlight is None: return set()
-    if isinstance(highlight, (str, int)): highlight = [highlight]
-    return {labels[h] if isinstance(h, int) else h for h in highlight}
+    labels = list(labels)
+    if isinstance(highlight, str) or (isinstance(highlight, int) and not isinstance(highlight, bool)):
+        items = [highlight]
+    else:
+        items = list(highlight)
+    found = set(); n = len(labels)
+    for item in items:
+        if item in labels:
+            found.add(item); continue
+        if isinstance(item, int) and not isinstance(item, bool) and -n <= item < n:
+            found.add(labels[item]); continue
+        raise ValueError("highlight %r is not one of the labels %s" % (item, labels))
+    return found
 def _clean(ax):
     ax.set_facecolor("none")
     for s in ax.spines.values(): s.set_visible(False)
@@ -254,17 +270,21 @@ def hbar(data, title, sub, name, source=None, fmt=None, highlight=None, sort=Tru
     return _result("bars", path, title, sub, source, [(l, v, l in hi) for l, v in data], fmt)
 
 # ---------------------------------------------------------------- 3. line chart
+def _grid_flag(grid):
+    """Explicit grid= wins. Otherwise use the active style (editorial-soft guides by default)."""
+    if grid is not _OMIT:
+        return grid
+    from eink_style import _ACTIVE
+    return _ACTIVE["grid"]
+
 def line_chart(x, series, title, sub, name, source=None, fmt=None, highlight=None, xticks=None, ylim=None, grid=_OMIT, style=None):
     """x: list of x labels/values; series: {name: [values]} (<= 4). highlight: series name (black, thick, solid).
     Others: thinner gray AND a distinct dash pattern (dash / dot / dash-dot). Direct end labels, no legend."""
     if style is not None:
-        def _again(design):
-            use_grid = design["grid"] if grid is _OMIT else grid
-            return line_chart(x, series, title, sub, name, source=source, fmt=fmt, highlight=highlight,
-                              xticks=xticks, ylim=ylim, grid=use_grid, style=None)
-        return _styled(style, _again)
-    if grid is _OMIT:
-        grid = True
+        return _styled(style, lambda _design: line_chart(
+            x, series, title, sub, name, source=source, fmt=fmt, highlight=highlight,
+            xticks=xticks, ylim=ylim, grid=grid, style=None))
+    grid = _grid_flag(grid)
     _need_source(source); fmt = fmt or _fmt
     if len(series) > MAX_LINES: raise ValueError("max %d lines per chart; split into small multiples" % MAX_LINES)
     names = list(series); hi = _hiset(names, highlight if highlight is not None else names[0])

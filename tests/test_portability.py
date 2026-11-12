@@ -103,25 +103,96 @@ def test_dangerous_paths(tmp):
     assert_true((ROOT / "SKILL.md").is_file(), "repo skill file missing after refusal")
 
 
+def _snapshot(directory):
+    return sorted((path.name, path.read_bytes()) for path in directory.iterdir())
+
+
+def test_force_respects_marker(tmp):
+    """--force replaces only a folder that already has this script's marker."""
+    marked = tmp / "marked"
+    marked.mkdir()
+    (marked / preview_kindle.PREVIEW_MARKER).write_text("kindle-reading-kit preview output\n")
+    (marked / "old.txt").write_text("old")
+    preview_kindle._prepare_outdir(marked, force=True)
+    assert_true(not (marked / "old.txt").exists(), "--force should replace a marked preview folder")
+    assert_true((marked / preview_kindle.PREVIEW_MARKER).is_file(), "replaced folder should keep the marker")
+    assert_true(list(marked.iterdir()) == [marked / preview_kindle.PREVIEW_MARKER], list(marked.iterdir()))
+
+    foreign = tmp / "documents"
+    foreign.mkdir()
+    keep = foreign / "taxes.txt"
+    keep.write_text("keep")
+    before = _snapshot(foreign)
+    try:
+        preview_kindle._prepare_outdir(foreign, force=True)
+        raise AssertionError("unmarked folder was replaced")
+    except ValueError as exc:
+        assert_true("Nothing was deleted" in str(exc), exc)
+        assert_true(".kindle-preview" in str(exc), exc)
+    assert_true(_snapshot(foreign) == before, "unmarked folder was changed")
+    assert_true(keep.read_text() == "keep", keep.read_text())
+
+    linked = tmp / "linked-marker"
+    linked.mkdir()
+    outside = tmp / "outside-marker-target"
+    outside.write_text("not a preview")
+    (linked / preview_kindle.PREVIEW_MARKER).symlink_to(outside)
+    (linked / "notes.txt").write_text("notes")
+    linked_before = _snapshot(linked)
+    try:
+        preview_kindle._prepare_outdir(linked, force=True)
+        raise AssertionError("symlink marker authorized a delete")
+    except ValueError as exc:
+        assert_true("Nothing was deleted" in str(exc), exc)
+    assert_true(_snapshot(linked) == linked_before, "symlink-marker folder was changed")
+    assert_true(outside.read_text() == "not a preview", "marker symlink target was changed")
+
+
 def test_nonempty_and_pages(tmp):
     epub = write_epub(tmp / "two.epub", opf_rel="OPS/package.opf", pages=("Alpha section", "Beta section"))
-    outdir = tmp / "preview"
-    outdir.mkdir()
-    sentinel = outdir / "keep.txt"
+    foreign = tmp / "not-ours"
+    foreign.mkdir()
+    sentinel = foreign / "keep.txt"
     sentinel.write_text("keep")
+    before = _snapshot(foreign)
+    for extra in ([], ["--force"]):
+        blocked = run([PY, str(SCRIPTS / "preview_kindle.py"), str(epub), str(foreign), *extra], cwd=tmp)
+        assert_true(blocked.returncode == 2, blocked.stderr)
+        assert_true("non-empty" in blocked.stderr, blocked.stderr)
+        assert_true("Nothing was deleted" in blocked.stderr, blocked.stderr)
+        assert_true("OK" not in blocked.stdout and "pages" not in blocked.stdout, blocked.stdout)
+        assert_true(_snapshot(foreign) == before, "preview changed an unmarked folder: %s" % extra)
+        assert_true(sentinel.read_text() == "keep", "preview deleted a non-empty directory")
+    assert_true(".kindle-preview" in blocked.stderr, blocked.stderr)
+
+    outdir = tmp / "preview"
+    first = run([PY, str(SCRIPTS / "preview_kindle.py"), str(epub), str(outdir)], cwd=tmp)
+    assert_true(first.returncode == 0, first.stderr)
+    assert_true("pages 2" in first.stdout, first.stdout)
+    marker = outdir / preview_kindle.PREVIEW_MARKER
+    assert_true(marker.is_file() and not marker.is_symlink(), "preview did not mark its own folder")
+    assert_true((outdir / "sheet_00.png").is_file(), "contact sheet missing")
+    from pypdf import PdfReader
+
+    def page_texts():
+        reader = PdfReader(str(outdir / "all.pdf"))
+        return [page.extract_text() or "" for page in reader.pages]
+
+    texts = page_texts()
+    assert_true(len(texts) == 2, texts)
+    assert_true("Alpha section" in texts[0] and texts[0].strip().splitlines()[-1] == "1", texts[0])
+    assert_true("Beta section" in texts[1] and texts[1].strip().splitlines()[-1] == "2", texts[1])
+    stale = outdir / "keep.txt"
+    stale.write_text("keep")
     blocked = run([PY, str(SCRIPTS / "preview_kindle.py"), str(epub), str(outdir)], cwd=tmp)
     assert_true(blocked.returncode == 2, blocked.stderr)
-    assert_true("non-empty" in blocked.stderr, blocked.stderr)
-    assert_true("OK" not in blocked.stdout, blocked.stdout)
-    assert_true(sentinel.read_text() == "keep", "preview deleted a non-empty directory without --force")
+    assert_true(stale.read_text() == "keep", "preview deleted a marked folder without --force")
     forced = run([PY, str(SCRIPTS / "preview_kindle.py"), str(epub), str(outdir), "--force"], cwd=tmp)
     assert_true(forced.returncode == 0, forced.stderr)
     assert_true("pages 2" in forced.stdout, forced.stdout)
-    assert_true(not sentinel.exists(), "--force should replace the destination")
-    assert_true((outdir / "sheet_00.png").is_file(), "contact sheet missing")
-    from pypdf import PdfReader
-    reader = PdfReader(str(outdir / "all.pdf"))
-    texts = [page.extract_text() or "" for page in reader.pages]
+    assert_true(not stale.exists(), "--force should replace a marked preview folder")
+    assert_true(marker.is_file(), "replacement should write the marker again")
+    texts = page_texts()
     assert_true(len(texts) == 2, texts)
     assert_true("Alpha section" in texts[0] and texts[0].strip().splitlines()[-1] == "1", texts[0])
     assert_true("Beta section" in texts[1] and texts[1].strip().splitlines()[-1] == "2", texts[1])
@@ -321,9 +392,10 @@ def main():
         test_container(tmp)
         test_missing_optional(tmp)
         test_style_argument_and_threads(tmp)
+        test_force_respects_marker(tmp)
         test_nonempty_and_pages(tmp)
         test_outside_repo(tmp)
-    print("PASS: dangerous paths, nonempty preview guard, continuous page numbers,")
+    print("PASS: dangerous paths, marker-only --force, continuous page numbers,")
     print("container.xml OPF resolution, core render without optional packages,")
     print("style= restoration, second-thread refusal, and kit runs from outside the repo.")
     print("Skip checks exited non-zero and did not print OK. A skip is not a pass.")
