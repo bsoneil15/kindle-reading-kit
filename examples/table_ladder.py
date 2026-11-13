@@ -40,7 +40,7 @@ def _cover(out, label):
 
 
 def build_after(out, chart):
-    body = '<p class="label">Tables and dense data</p><h1>%s</h1>' % html.escape(HEADING)
+    body = ep.chapter_head("Tables and dense data", HEADING)
     body += '<p class="lede">Chart first for the pattern. The values follow as text, so they reflow at any font size.</p>'
     fig = kit.figure_html(chart, alt=kit.text_fallback(chart))
     body += ep.to_xhtml(ep.generic(fig, ep.Notes("t"), {"img/" + Path(chart["path"]).name: fig}))
@@ -49,11 +49,10 @@ def build_after(out, chart):
                             detail_title="Other fields by region")
     body += table + '<p class="small">%s</p>' % html.escape(SOURCE)
     docs = [("cover.xhtml", "Cover", ep.page("Table ladder", '<h1>Table ladder: after</h1><p>Fictional data.</p>' + ep.next_link("data.xhtml", "Data"))),
-            ("data.xhtml", "Q3 by region", ep.page(TITLE, ep.to_xhtml(body)))]
+            ("data.xhtml", "Q3 by region", ep.page(TITLE, ep.to_xhtml(body), "chapter"))]
     path = out / "Table-Ladder-After.epub"
     ep.write_epub(str(path), dict(title="Table ladder after", date="2026-11-12", desc="Fictional table ladder sample."),
-                  docs, [(chart["path"], "img/" + Path(chart["path"]).name)], _cover(out, "after"),
-                  [("Q3 by region", "data.xhtml", [])])
+                  docs, [(chart["path"], "img/" + Path(chart["path"]).name)], _cover(out, "after"))
     return path, plan
 
 
@@ -68,8 +67,7 @@ def build_before(out, chart):
             ("data.xhtml", "Q3 by region", ep.page(TITLE, body))]
     path = out / "Table-Ladder-Before.epub"
     ep.write_epub(str(path), dict(title="Table ladder before", date="2026-11-12", desc="Fictional print-style table."),
-                  docs, [(chart["path"], "img/" + Path(chart["path"]).name)], _cover(out, "before"),
-                  [("Q3 by region", "data.xhtml", [])])
+                  docs, [(chart["path"], "img/" + Path(chart["path"]).name)], _cover(out, "before"))
     return path
 
 

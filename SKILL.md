@@ -133,6 +133,18 @@ One default plus four alternatives. Keep all five available.
 4. **Pattern & Texture** (`pattern-texture`): hatches on comparison bars and open markers on comparison trends. Focus stays solid black. Avoid moiré.
 5. **Economist-style Editorial** (`economist-editorial`): top rule, guides, 2 pt context strokes. Grammar only: no logo, trade dress, or claim of affiliation.
 
+## Chapters and contents
+
+Kindle builds its Go To menu and the chapter part of its progress display from the
+book's contents (the toc nav, or the NCX), and it shows two levels at most.
+
+- One chapter per topic, not one per chart. A chapter opens with an `h1`; each chart is a section with its own short visible `h2` (for example "Line") above the image.
+- Contents have two levels: chapters, then sections. Never deeper. `h3` stays out of the menu.
+- Every menu label is the heading text on that page. A chapter's short name is the kicker inside its `h1`.
+- A visible contents page sits near the front, after the opening page, with sections indented under chapters. It does not list itself; the landmarks nav links it for Go To.
+- The cover, the contents page, and the opening page are set as landmarks. Amazon may still choose where "Go to Beginning" lands.
+- Each chapter and section is its own file, so each starts on a new page.
+
 ## Handoff
 
 Tier A and tier B follow `RUNBOOK.md`, then list checks that ran and checks that

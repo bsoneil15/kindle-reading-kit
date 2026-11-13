@@ -34,12 +34,14 @@ MAX_HEADER_CHARS = 14
 PAD_EM = 0.8          # left + right cell padding in the CSS below
 
 TABLE_CSS = """
+.kt-lead { page-break-after: avoid; }
 .kt-t { font-weight: bold; margin: 1em 0 0.3em 0; page-break-after: avoid; }
 table.kt { width: 100%; border-collapse: collapse; margin: 0 0 0.4em 0; border-top: 2px solid #000; border-bottom: 2px solid #000; }
 table.kt td, table.kt th { hyphens: none; }
 table.kt th, table.kt td { padding: 0.2em 0.4em; vertical-align: top; text-align: left; line-height: 1.3; }
 table.kt th { font-weight: bold; border-bottom: 2px solid #000; }
 table.kt th.kt-n, table.kt td.kt-n { text-align: right; white-space: nowrap; }
+table.kt { page-break-inside: avoid; }
 table.kt tr { page-break-inside: avoid; }
 table.kt tr.kt-f td { font-weight: bold; }
 table.kt-c2 .kt-l { width: 60%; }

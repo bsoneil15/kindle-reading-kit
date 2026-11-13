@@ -32,6 +32,7 @@ python scripts/test_kit.py
 python tests/test_styles.py
 python tests/test_portability.py
 python tests/test_tables.py
+python tests/test_nav.py
 python examples/build_sample.py --out output/sample
 python scripts/check_epub.py output/sample/E-ink-Chart-Default-Sample.epub
 python scripts/preview_kindle.py output/sample/E-ink-Chart-Default-Sample.epub output/preview
@@ -60,10 +61,10 @@ your Send to Kindle address. Without that, you move the file over by hand.
 The agent sends only when you ask.
 
 ## Files
-- `SKILL.md`: platform-neutral recipe (tiers, numeric table, forms, tables, styles).
+- `SKILL.md`: platform-neutral recipe (tiers, numeric table, forms, tables, styles, chapters).
   Copy this folder into a skill loader or supply it with the prompt.
 - `RUNBOOK.md`: repo install, paths, packaging, preview safety, device notes.
-- `evals/prompts.md`: nine behavior prompts and the expected agent response.
+- `evals/prompts.md`: ten behavior prompts and the expected agent response.
 - `scripts/kindle_charts.py`: core bars, lines, slopes, ranges, callouts, palette
   validator, downscaling, text fallback and figure HTML. Chart functions take
   an optional `style=` argument.
@@ -72,17 +73,22 @@ The agent sends only when you ask.
 - `scripts/kindle_tables.py`: the table ladder. Picks prose, a ranked list, a
   small text table, or record cards so values reflow at any font size, and lints
   tables in an EPUB.
+- `scripts/epub_nav.py`: two-level contents built from chapter and section
+  headings, and the navigation checks `check_epub.py` runs.
 - `scripts/epub_paths.py`: OPF path from `META-INF/container.xml`.
 - `scripts/check_epub.py`, `preview_kindle.py`: structural checks and simulation.
 - `examples/data.json`: **fictional** 2025 regional shipments in thousands;
   identical data across all forms and options. `render_charts.py` is the plotting
   example; `matplotlib_only.py` is a self-contained Matplotlib script;
-  `build_sample.py` builds a short EPUB and a six-chart contact sheet.
+  `build_sample.py` builds a short EPUB (5 chapters, charts as sections) and a
+  six-chart contact sheet.
   `table_ladder.py` builds a before and after EPUB from one fictional table.
 - `assets/preview-editorial-soft.svg`: README preview rendered from the fictional example data.
 - `tests/test_styles.py`: all five styles × six forms, input checks, restoration.
 - `tests/test_portability.py`: preview path guards, container.xml, missing optional
   dependencies, and runs from a directory other than the repo root.
+- `tests/test_nav.py`: contents from headings, NCX depth, landmarks, navigation
+  lint, book id, and cover size.
 - `tests/test_tables.py`: table ladder choices, caps, focal rows, EPUB table lint,
   and a larger `--font-scale` preview.
 
