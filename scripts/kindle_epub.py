@@ -1,5 +1,5 @@
 """Kindle EPUB toolkit: e-ink CSS, per-section tap-to-open source notes, print-HTML -> Kindle-HTML
-transform (tables -> stacked records, figures swapped or dropped), EPUB3 + NCX packaging, cover art.
+transform (print tables -> stacked records, small kt tables kept, figures swapped or dropped), EPUB3 + NCX packaging, cover art.
 
 Import from a build script (do not depend on the current directory):
   from pathlib import Path
@@ -10,6 +10,8 @@ Call set_sources({key: (label, url)}) once if content uses [[key]] citation mark
 """
 import re, html, uuid, zipfile, datetime, sys, os
 from bs4 import BeautifulSoup, NavigableString
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kindle_tables import TABLE_CSS
 
 CSS = """
 body { margin: 0; padding: 0; }
@@ -53,7 +55,7 @@ a.nref { text-decoration: none; }
 .tier { font-size: 0.8em; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; }
 .cover { text-align: center; margin: 0; padding: 0; }
 .cover img { width: 100%; }
-"""
+""" + TABLE_CSS
 
 SRC = {}
 def set_sources(d):
@@ -90,7 +92,10 @@ class Notes:
 def slug(t): return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")[:40]
 
 def tables_to_records(soup):
+    """Turn print tables into stacked records. Tables from kindle_tables.text_table_html
+    (class "kt") already meet the e-ink caps and are kept as tables."""
     for t in soup.find_all("table"):
+        if "kt" in (t.get("class") or []): continue
         rows = t.find_all("tr")
         if not rows: t.decompose(); continue
         head = [c.get_text(" ", strip=True) for c in rows[0].find_all("th")]

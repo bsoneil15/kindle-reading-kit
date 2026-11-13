@@ -73,7 +73,9 @@ Use one XHTML file per section. Open a chapter with a kicker, an action title,
 exactly three short claims, a lede, and jump links when there are two or more
 `h2` sections. A chart-only section can be one figure, a next link, and the local
 source note. Give every image meaningful alt text and keep the values in the book
-as text. No HTML tables and no private URLs. Native text stays in `em`.
+as text. No private URLs. Native text stays in `em`. The only HTML tables are
+`kindle_tables` output (class `kt`, at most 3 columns). `generic()` keeps those
+and turns every other table into stacked records.
 
 `generic()` drops a `div.fig` whose image `src` is not a `FIGMAP` key. Register
 `FIGMAP[src] = figure_html(chart)` or append the figure after `generic()`.
@@ -84,6 +86,40 @@ with Next, then its source notes.
 assume `OEBPS/content.opf`. It checks the mimetype entry, XML parsing, manifest
 paths, and internal links. It is a structural check for when epubcheck is absent.
 It does not certify Kindle conversion.
+
+## Tables and dense data
+
+Design rules are in `SKILL.md`. `scripts/kindle_tables.py` has no third-party
+imports, so tier B can use it.
+
+```python
+import kindle_tables as kt
+rows = [{"Region": "East", "Q3, k": 1702, "YoY": "+9.1%", "Util": "71%"}, ...]
+html_out, plan = kt.render(["Region", "Q3, k", "YoY", "Util"], rows,
+                           show=["Region", "Q3, k", "YoY"], title="Q3 by region",
+                           focal="East", sort_by="Q3, k",
+                           notes=["k = thousand units. YoY = change from Q3 last year."])
+print(plan["form"], plan["reasons"])  # text-table, then cards for Util
+```
+
+`plan()` picks prose, ranked list, text table, or record cards and says why.
+`text_table_html()` raises `ValueError` when a table breaks a cap, so a wide
+table cannot slip through. `table_fit()` estimates the font scale where a row
+stops fitting one line (`LINE_EM` 26 em at the default size, an assumption from
+the preview page). Notes land under the table, where the short headers appear.
+
+`check_epub.py` flags any table with more than 3 columns, a nested table, or a
+fixed width. `examples/table_ladder.py` builds an after EPUB that passes and a
+before EPUB (7 columns floated beside the chart) that fails on purpose.
+
+Check reflow at two sizes. `--font-scale` multiplies the 9.5 pt base text; chart
+images keep their size, as on a Kindle:
+
+```sh
+python examples/table_ladder.py --out output/tables
+python scripts/preview_kindle.py output/tables/Table-Ladder-After.epub output/tables/after-1x
+python scripts/preview_kindle.py output/tables/Table-Ladder-After.epub output/tables/after-2x --font-scale 2
+```
 
 ## Preview safety
 
@@ -147,6 +183,7 @@ python examples/render_charts.py --style pattern-texture --out output/pattern
 python scripts/test_kit.py
 python tests/test_styles.py
 python tests/test_portability.py
+python tests/test_tables.py
 python examples/build_sample.py --out output/sample
 python scripts/check_epub.py output/sample/E-ink-Chart-Default-Sample.epub
 python scripts/preview_kindle.py output/sample/E-ink-Chart-Default-Sample.epub output/preview

@@ -3,9 +3,10 @@ name: kindle-reading-kit
 description: >
   Design or redraw charts for Kindle and other grayscale e-readers. Trigger
   phrases include "make this chart readable on Kindle", "e-ink friendly chart",
-  and "grayscale chart for e-reader". Use for chart form, the focal series,
-  gray values, and short chart samples. For a full book or report conversion,
-  use kindle-edition. Also known as eink-chart-design.
+  "grayscale chart for e-reader", and "make this table readable on Kindle".
+  Use for chart form, the focal series, gray values, tables and dense data
+  next to charts, and short chart samples. For a full book or report
+  conversion, use kindle-edition. Also known as eink-chart-design.
 ---
 
 # kindle-reading-kit
@@ -89,6 +90,40 @@ small multiples are preferred. Split series that cross or land on the same label
 No 3-D, dual axes, fine gradients, transparency-as-meaning, or decorative grids.
 Guides must help estimation. Push back on pies. If one is unavoidable, use at most
 3 directly labeled slices and say a ranked bar is usually clearer.
+
+## Tables and dense data
+
+Native text reflows when the reader changes the font size. Images do not. A table
+drawn as a picture stays the size it was drawn, cannot paginate, and cannot be
+read aloud, so values live in text and images carry patterns. Amazon's Kindle
+table guidance agrees: HTML over images, no paragraphs in cells, and single
+columns of text read best across font sizes. With Enhanced Typesetting, a table
+of more than 3 columns opens a pan and zoom viewer, and wide tables can shrink.
+
+Ask what the reader does with the data: take one number, compare a ranking, look
+up one item, or see a pattern. Then use the first rung that fits.
+
+1. **Prose.** At most 3 numbers in total. Write the sentence.
+2. **Ranked list.** One value per item. Ordered list sorted by the claim, focal item bold: `East: 1,702 (+9.1%)`.
+3. **Text table.** A label column plus at most 2 short value columns. Values at most 10 characters, labels at most 24, headers at most 14. Each row must still fit one line at 2x the default font size. Widths in % only. At most 12 rows per table; split longer ones and repeat the header.
+4. **Record cards.** Anything wider or wordier. One block per item: label and key value on the head line, then `Field: value` pairs that wrap as whole units. Cards reflow at every size.
+5. **Chart image.** Only when the pattern is the point, using the forms above. It is fixed, so keep its caps (8 bars, 4 sparkline rows), 9.5 pt minimum raster type, full width, and aspect at most 1.30. Alt text states the takeaway, and the values follow in rung 1 to 4 text. Never ship a screenshot of a grid.
+
+Rules for every rung:
+
+- Chart first, then the values behind it, at full width. Never set a table beside a chart. No floats.
+- Show only the columns the claim needs. Extra fields drop to record cards below the table.
+- Sort rows by the claim: descending on the focal metric, or time order for time. Bold the focal row, the same entity that is black in the chart.
+- Right-align numbers. Same decimals in a column, thousands separators, a sign on changes. Units go in the header (`Q3, k`), not in every cell.
+- Abbreviate headers, then define every abbreviation in a key line directly under the table. Notes and footnotes go below the grid, never in a cell.
+- Grayscale only. Black rules under the header and at the bottom. No zebra fills, light gray rules, or color.
+- Preview at 1x and 2x font size. Text should reflow; the chart should stay one page.
+
+Repo helper: `scripts/kindle_tables.py` (`plan`, `render`, and the three HTML
+builders). Tier C writes the same HTML by hand and says it was not rendered.
+Width checks are estimates from average glyph widths, not a device measurement.
+
+## Styles
 
 One default plus four alternatives. Keep all five available.
 

@@ -74,6 +74,11 @@ def main(out):
         'South rises from 36 to 40 thousand shipments.'])
     data+='<p class="lede">The full fictional input is retained for checking every form.</p>'
     data+='<p class="small">Months: '+', '.join(DATA['months'])+'. Units: thousand shipments, 2025.</p>'
+    import kindle_tables as kt
+    rows=[{'Region':k,'Jan':v[0],'Dec':v[-1]} for k,v in DATA['series'].items()]
+    data+=kt.text_table_html(['Region','Jan','Dec'],rows,title='January and December, thousands',
+                             focal='North',sort_by='Dec')
+    data+='<p class="kt-t">All 12 months</p>'
     for region,values in DATA['series'].items():
         data+='<div class="rec"><p class="rec-h">'+escape(region)+'</p><p>'+', '.join(map(str,values))+'.</p></div>'
     data+=ep.next_link('feedback.xhtml','3 feedback questions')+'<p class="small">'+escape(SOURCE)+' Ranges show observed monthly minima and maxima, not uncertainty intervals.</p>'
