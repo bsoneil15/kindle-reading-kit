@@ -69,21 +69,80 @@ Tier C returns that kind of code and does not claim it ran.
 contents list, tap navigation, and source notes. It is for a chart sample in this
 repo. A full book or report conversion belongs to the kindle-edition skill.
 
-Use one XHTML file per section. Open a chapter with a kicker, an action title,
+Use one XHTML file per chapter or section. Open a chapter with `chapter_head()`:
+the kicker (the chapter's menu name) and the action title share the `h1`, then
 exactly three short claims, a lede, and jump links when there are two or more
-`h2` sections. A chart-only section can be one figure, a next link, and the local
-source note. Give every image meaningful alt text and keep the values in the book
-as text. No HTML tables and no private URLs. Native text stays in `em`.
+sections. A chart section starts with `section_head("Line")` (a short `h2`), then
+one figure, a next link, and the local source note. Wrap bodies with
+`page(title, body, kind)`, where kind is `chapter`, `section`, `cover`, or `toc`. Give every image meaningful alt text and keep the values in the book
+as text. No private URLs. Native text stays in `em`. The only HTML tables are
+`kindle_tables` output (class `kt`, at most 3 columns). `generic()` keeps those
+and turns every other table into stacked records.
 
 `generic()` drops a `div.fig` whose image `src` is not a `FIGMAP` key. Register
 `FIGMAP[src] = figure_html(chart)` or append the figure after `generic()`.
 `figure_html` and `text_fallback` live in `kindle_charts.py`. Close each section
 with Next, then its source notes.
 
+Contents come from the headings. `write_epub(path, meta, docs, images, cover)`
+calls `epub_nav.build_nav(docs)` when you omit `nav`: each file with an `h1` is a
+chapter, every `h2` inside it (with an `id`; `add_h2_ids` sets them) is a section,
+and a file that starts with an `h2` is a section of the chapter before it. Notes
+blocks are skipped. The cover (first document) and `contents.xhtml` stay out of
+the menu. Build the visible contents page with `contents_html(build_nav(docs))`.
+A hand-written `nav` deeper than 2 levels raises `ValueError`. The NCX declares
+the real depth.
+
+Metadata: `meta` needs `title`, `date`, and `desc`. `author` defaults to
+`kindle-reading-kit`. The book id comes from title, author, and date, so a new
+date or author makes a new id; pass `identifier` to pin one. Make the library
+cover with `make_cover()` (1600 x 2560 JPEG, Lato if installed, else DejaVu).
+
 `check_epub.py` reads the package path from `META-INF/container.xml`. It does not
 assume `OEBPS/content.opf`. It checks the mimetype entry, XML parsing, manifest
-paths, and internal links. It is a structural check for when epubcheck is absent.
+paths, internal links, tables, and navigation: at most 2 levels, no duplicates,
+contents in reading order, an entry for every spine document except the cover and
+contents page, labels that match their headings, and an NCX that mirrors the nav. It is a structural check for when epubcheck is absent.
 It does not certify Kindle conversion.
+
+## Tables and dense data
+
+Design rules are in `SKILL.md`. `scripts/kindle_tables.py` has no third-party
+imports, so tier B can use it.
+
+```python
+import kindle_tables as kt
+rows = [{"Region": "East", "Q3, k": 1702, "YoY": "+9.1%", "Util": "71%"}, ...]
+html_out, plan = kt.render(["Region", "Q3, k", "YoY", "Util"], rows,
+                           show=["Region", "Q3, k", "YoY"], title="Q3 by region",
+                           focal="East", sort_by="Q3, k",
+                           notes=["k = thousand units. YoY = change from Q3 last year."])
+print(plan["form"], plan["reasons"])  # text-table, then cards for Util
+```
+
+`plan()` picks prose, ranked list, text table, or record cards and says why.
+`text_table_html()` raises `ValueError` when a table breaks a cap, so a wide
+table cannot slip through. `table_fit()` estimates the font scale where a row
+stops fitting one line (`LINE_EM` 26 em at the default size, an assumption from
+the preview page). `notes` land under the table, where the short headers appear.
+A whole `kt` table avoids a page break inside it. Give any line between its
+heading and the table `class="kt-lead"` so the heading moves with the table.
+`detail_notes` land under the record cards. Put the source line after both.
+
+`check_epub.py` flags any table with more than 3 columns, a nested table, or a
+fixed width. `examples/table_ladder.py` builds an after EPUB that passes and a
+before EPUB (7 columns floated beside the chart) that fails on purpose.
+
+Check reflow at two sizes. `--font-scale` multiplies the 9.5 pt base text; chart
+images keep their size, as on a Kindle. At 1.5 and above the preview sets text
+ragged right, imitating Kindle's documented fallback to left-aligned text at
+large sizes (the exact device threshold is not published):
+
+```sh
+python examples/table_ladder.py --out output/tables
+python scripts/preview_kindle.py output/tables/Table-Ladder-After.epub output/tables/after-1x
+python scripts/preview_kindle.py output/tables/Table-Ladder-After.epub output/tables/after-2x --font-scale 2
+```
 
 ## Preview safety
 
@@ -147,6 +206,8 @@ python examples/render_charts.py --style pattern-texture --out output/pattern
 python scripts/test_kit.py
 python tests/test_styles.py
 python tests/test_portability.py
+python tests/test_tables.py
+python tests/test_nav.py
 python examples/build_sample.py --out output/sample
 python scripts/check_epub.py output/sample/E-ink-Chart-Default-Sample.epub
 python scripts/preview_kindle.py output/sample/E-ink-Chart-Default-Sample.epub output/preview

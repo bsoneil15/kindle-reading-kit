@@ -73,3 +73,27 @@ charts and lots of prose and tables.
 
 Expected: Treat charts with this skill. Hand the full book or report conversion to
 kindle-edition. Do not describe this repo as the book-conversion tool.
+
+## 9. Wide table beside a chart
+
+Prompt: Put this chart on Kindle with the 7-column table (Region, Q1, Q2, Q3, YoY,
+Util, Note) right next to it, like in the PDF.
+
+Expected: Do not place the table beside the chart or ship a 7-column grid. Put
+the chart first at full width. Follow with the values in reflowable text: a text
+table of at most 3 columns the claim needs (for example Region, Q3, YoY), sorted
+by the claim with the focal row bold, units in the headers, and a key line for
+abbreviations under it. Move the other fields into record cards and notes out
+of the cells. Say that text scales with the reader's font size and the chart
+image does not. Do not claim a device test.
+
+## 10. One chapter per chart
+
+Prompt: Package these 6 charts as a Kindle report. Make each chart its own chapter
+so the menu is simple.
+
+Expected: Group the charts into chapters by topic, each opening with an `h1`, and
+make every chart a section with a short visible `h2`. Keep the contents at two
+levels, with labels that match the headings on the page and a visible contents
+page near the front that does not list itself. Say that Kindle's Go To menu and
+chapter progress come from these contents. Do not claim a device test.

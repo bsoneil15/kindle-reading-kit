@@ -3,6 +3,10 @@
 Usage:
   python3 preview_kindle.py book.epub outdir
   python3 preview_kindle.py book.epub outdir --force
+  python3 preview_kindle.py book.epub outdir --font-scale 2
+
+--font-scale multiplies the 9.5 pt base text size to imitate the reader's font
+setting. Native text reflows; chart images keep their size, as on a Kindle.
 
 Writes a .kindle-preview marker in outdirs it creates. --force replaces only a
 non-empty outdir that has that marker. Any other non-empty outdir is refused
@@ -35,7 +39,7 @@ PAGE_CSS = """
   margin: 0.22in 0.25in 0.3in 0.25in;
   @bottom-center { content: counter(page); font-size: 7pt; }
 }
-html { font-family: 'Bitstream Charter', 'DejaVu Serif', serif; font-size: 9.5pt; text-align: justify; }
+html { font-family: 'Bitstream Charter', 'DejaVu Serif', serif; font-size: BASEpt; text-align: justify; }
 img { max-height: 4.8in; }
 """
 
@@ -46,6 +50,7 @@ _BROAD = (
 )
 # Present only in folders this script created (or an empty folder it adopted).
 PREVIEW_MARKER = ".kindle-preview"
+BASE_PT = 9.5
 
 
 def _contains(parent, child):
@@ -181,13 +186,21 @@ def _prepare_outdir(outdir, force):
     _mark_preview_dir(outdir)
 
 
-def _section_css(start_page):
+def _section_css(start_page, font_scale=1.0):
     from weasyprint import CSS
-    return CSS(string=PAGE_CSS + "\n@page:first { counter-reset: page %d; }\n" % start_page)
+    page_css = PAGE_CSS.replace("BASEpt", "%.2fpt" % (BASE_PT * font_scale))
+    if font_scale >= 1.5:  # Kindle falls back to left-aligned text at large sizes
+        page_css += "\nhtml, p, li { text-align: left !important; }\n"
+    return CSS(string=page_css + "\n@page:first { counter-reset: page %d; }\n" % start_page)
 
 
-def render_preview(epub, outdir, force=False):
-    """Render epub into outdir. Raises ValueError on refusal. Returns page count."""
+def render_preview(epub, outdir, force=False, font_scale=1.0):
+    """Render epub into outdir. Raises ValueError on refusal. Returns page count.
+
+    font_scale multiplies the base text size (1.0 = 9.5 pt) to imitate a larger
+    reader font setting. Images keep their size."""
+    if not 0.5 <= font_scale <= 4:
+        raise ValueError("font scale %.2f is outside 0.5 to 4. Nothing was deleted." % font_scale)
     epub = Path(epub)
     outdir = Path(outdir)
     skipped = dependency_problem()
@@ -220,7 +233,7 @@ def render_preview(epub, outdir, force=False):
         source = extract_root / item
         pdf_path = out_resolved / (source.stem + ".pdf")
         document = HTML(filename=str(source), base_url=str(source.parent) + os.sep).render(
-            stylesheets=[_section_css(start)])
+            stylesheets=[_section_css(start, font_scale)])
         document.write_pdf(str(pdf_path))
         start += len(document.pages)
         writer.append(str(pdf_path))
@@ -247,6 +260,8 @@ def main(argv=None):
                         help="replace a non-empty outdir this script created "
                              "(it has a .kindle-preview marker); "
                              "does not override a dangerous path or an unrelated folder")
+    parser.add_argument("--font-scale", type=float, default=1.0,
+                        help="multiply the 9.5 pt base text size, for example 2 to check a large reader font")
     args = parser.parse_args(argv)
     reason = dangerous_output_reason(args.outdir)
     if reason:
@@ -257,7 +272,7 @@ def main(argv=None):
         print(skipped, file=sys.stderr)
         return 2
     try:
-        pages = render_preview(args.epub, args.outdir, force=args.force)
+        pages = render_preview(args.epub, args.outdir, force=args.force, font_scale=args.font_scale)
     except (ValueError, subprocess.CalledProcessError, OSError) as exc:
         message = str(exc)
         if "preview skipped" not in message and "Nothing was deleted" not in message:

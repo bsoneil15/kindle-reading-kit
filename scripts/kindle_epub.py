@@ -1,5 +1,5 @@
 """Kindle EPUB toolkit: e-ink CSS, per-section tap-to-open source notes, print-HTML -> Kindle-HTML
-transform (tables -> stacked records, figures swapped or dropped), EPUB3 + NCX packaging, cover art.
+transform (print tables -> stacked records, small kt tables kept, figures swapped or dropped), EPUB3 + NCX packaging, cover art.
 
 Import from a build script (do not depend on the current directory):
   from pathlib import Path
@@ -10,12 +10,22 @@ Call set_sources({key: (label, url)}) once if content uses [[key]] citation mark
 """
 import re, html, uuid, zipfile, datetime, sys, os
 from bs4 import BeautifulSoup, NavigableString
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kindle_tables import TABLE_CSS
+from epub_nav import build_nav, nav_depth, MAX_DEPTH
+
+DEFAULT_AUTHOR = "kindle-reading-kit"
 
 CSS = """
 body { margin: 0; padding: 0; }
 a { color: #000; text-decoration: underline; }
 p { margin: 0 0 0.55em 0; text-indent: 0; line-height: 1.4; }
 .label { font-size: 0.78em; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 0.15em 0; }
+h1, h2, h3 { text-align: left; }
+h1 .label { display: block; font-size: 0.54em; margin: 0 0 0.35em 0; }
+.sec-h { font-size: 0.8em; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 0.4em 0; }
+.toc1 { margin: 0.55em 0 0.15em 0; font-weight: bold; }
+.toc2 { margin: 0 0 0.15em 1.2em; }
 h1 { font-size: 1.45em; line-height: 1.2; margin: 0 0 0.7em 0; page-break-after: avoid; }
 h2 { font-size: 1.2em; line-height: 1.25; margin: 1.5em 0 0.45em 0; page-break-after: avoid; }
 h3 { font-size: 1.05em; line-height: 1.25; margin: 1.3em 0 0.25em 0; page-break-after: avoid; }
@@ -53,7 +63,7 @@ a.nref { text-decoration: none; }
 .tier { font-size: 0.8em; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; }
 .cover { text-align: center; margin: 0; padding: 0; }
 .cover img { width: 100%; }
-"""
+""" + TABLE_CSS
 
 SRC = {}
 def set_sources(d):
@@ -90,7 +100,10 @@ class Notes:
 def slug(t): return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")[:40]
 
 def tables_to_records(soup):
+    """Turn print tables into stacked records. Tables from kindle_tables.text_table_html
+    (class "kt") already meet the e-ink caps and are kept as tables."""
     for t in soup.find_all("table"):
+        if "kt" in (t.get("class") or []): continue
         rows = t.find_all("tr")
         if not rows: t.decompose(); continue
         head = [c.get_text(" ", strip=True) for c in rows[0].find_all("th")]
@@ -159,7 +172,17 @@ def add_h2_ids(soup):
         i = h.get("id") or "h-" + slug(h.get_text()); h["id"] = i; items.append((i, h.get_text(" ", strip=True)))
     return items
 
-def page(title, body):
+def page(title, body, kind=None):
+    """XHTML document. kind: "chapter" wraps the body in <section epub:type="chapter">,
+    "section" in a plain <section>, "cover" in <section epub:type="cover">, "toc" in
+    <section epub:type="toc">. None leaves the body as is."""
+    wrap = {"chapter": '<section epub:type="chapter" role="doc-chapter">',
+            "section": "<section>",
+            "cover": '<section epub:type="cover">',
+            "toc": '<section epub:type="toc" role="doc-toc">'}
+    if kind is not None:
+        if kind not in wrap: raise ValueError("unknown page kind %r" % kind)
+        body = wrap[kind] + body + "</section>"
     return ('<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" '
             'xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en"><head><meta charset="utf-8"/>'
             '<title>%s</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>%s</body></html>'
@@ -172,27 +195,42 @@ def to_xhtml(soup_or_str):
     s = s.replace("&nbsp;", "&#160;")
     return s
 
-def write_epub(path, meta, docs, images, cover_img, nav):
-    """meta: title, date (YYYY-MM-DD), desc, optional author/lang. docs: ordered (fname, title, xhtml);
-    docs[0] must be cover.xhtml, docs[1] is the start page. Add contents.xhtml for a visible TOC.
-    images: (local_path, "img/name.png"). nav: (title, href, [children]) recursive."""
+def book_id(meta):
+    """Stable per edition: title + author + date (or meta["identifier"] when given).
+    Two books with the same title but a different author or date get different ids."""
+    if meta.get("identifier"): return meta["identifier"]
+    key = "|".join([meta["title"], meta.get("author") or DEFAULT_AUTHOR, meta.get("date", "")])
+    return "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, "kindle-reading-kit:" + key))
+
+def write_epub(path, meta, docs, images, cover_img, nav=None):
+    """meta: title, date (YYYY-MM-DD), desc, optional author (default DEFAULT_AUTHOR), lang,
+    identifier. docs: ordered (fname, title, xhtml); docs[0] must be cover.xhtml, docs[1] is the
+    start page. Add contents.xhtml for a visible TOC (contents_html builds its body).
+    images: (local_path, "img/name.png"). nav: omit to build the contents from the h1/h2
+    headings (epub_nav.build_nav), or pass (title, href, [children]) at most 2 levels deep."""
     from lxml import etree
     for fn, t, x in docs:
         try: etree.fromstring(x.encode("utf-8"))
         except Exception as e: raise SystemExit("XHTML error in %s: %s" % (fn, e))
-    uid = "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, meta["title"]))
-    mod = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    if nav is None: nav = build_nav(docs)
+    depth = nav_depth(nav)
+    if depth > MAX_DEPTH: raise ValueError("contents are %d levels deep; Kindle supports %d" % (depth, MAX_DEPTH))
+    uid = book_id(meta)
+    mod = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     def navol(items):
         h = "<ol>"
         for t, href, ch in items:
             h += '<li><a href="%s">%s</a>%s</li>' % (href, html.escape(t), navol(ch) if ch else "")
         return h + "</ol>"
     first_body = docs[1][0]
-    tocref = "contents.xhtml" if any(d[0] == "contents.xhtml" for d in docs) else first_body
+    has_toc_page = any(d[0] == "contents.xhtml" for d in docs)
+    # Without a visible contents page, leave the toc landmark and guide item out rather than
+    # pointing them at body text. The Go To menu still lists every chapter from the toc nav.
+    toc_lm = '<li><a epub:type="toc" href="contents.xhtml">Contents</a></li>' if has_toc_page else ""
+    toc_guide = '<reference type="toc" title="Contents" href="contents.xhtml"/>' if has_toc_page else ""
     navx = page("Contents", '<nav epub:type="toc" id="toc"><h1>Contents</h1>%s</nav>'
                 '<nav epub:type="landmarks" hidden="hidden"><ol><li><a epub:type="cover" href="cover.xhtml">Cover</a></li>'
-                '<li><a epub:type="toc" href="TOCREF">Contents</a></li>'
-                '<li><a epub:type="bodymatter" href="%s">Start</a></li></ol></nav>' % (navol(nav), first_body)).replace("TOCREF", tocref)
+                '%s<li><a epub:type="bodymatter" href="%s">Start</a></li></ol></nav>' % (navol(nav), toc_lm, first_body))
     cnt = [0]
     def ncxp(items):
         h = ""
@@ -201,8 +239,8 @@ def write_epub(path, meta, docs, images, cover_img, nav):
             h += '<navPoint id="np%d" playOrder="%d"><navLabel><text>%s</text></navLabel><content src="%s"/>%s</navPoint>' % (cnt[0], cnt[0], html.escape(t), href, ncxp(ch) if ch else "")
         return h
     ncx = ('<?xml version="1.0" encoding="utf-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">'
-           '<head><meta name="dtb:uid" content="%s"/><meta name="dtb:depth" content="2"/></head><docTitle><text>%s</text></docTitle>'
-           '<navMap>%s</navMap></ncx>' % (uid, html.escape(meta["title"]), ncxp(nav)))
+           '<head><meta name="dtb:uid" content="%s"/><meta name="dtb:depth" content="%d"/></head><docTitle><text>%s</text></docTitle>'
+           '<navMap>%s</navMap></ncx>' % (uid, depth, html.escape(meta["title"]), ncxp(nav)))
     man = ['<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
            '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
            '<item id="css" href="style.css" media-type="text/css"/>',
@@ -218,9 +256,9 @@ def write_epub(path, meta, docs, images, cover_img, nav):
            '<dc:creator>%s</dc:creator><dc:language>%s</dc:language><dc:date>%s</dc:date><dc:description>%s</dc:description>'
            '<meta property="dcterms:modified">%s</meta><meta name="cover" content="cover-img"/></metadata>'
            '<manifest>%s</manifest><spine toc="ncx">%s</spine>'
-           '<guide><reference type="cover" title="Cover" href="cover.xhtml"/><reference type="toc" title="Contents" href="TOCREF"/>'
+           '<guide><reference type="cover" title="Cover" href="cover.xhtml"/>TOCGUIDE'
            '<reference type="text" title="Start" href="%s"/></guide></package>'
-           % (uid, html.escape(meta["title"]), html.escape(meta.get("author", "E-ink Chart Lab")), meta.get("lang", "en"), meta["date"], html.escape(meta["desc"]), mod, "".join(man), "".join(spine), first_body)).replace("TOCREF", tocref)
+           % (uid, html.escape(meta["title"]), html.escape(meta.get("author") or DEFAULT_AUTHOR), meta.get("lang", "en"), meta["date"], html.escape(meta["desc"]), mod, "".join(man), "".join(spine), first_body)).replace("TOCGUIDE", toc_guide)
     with zipfile.ZipFile(path, "w") as z:
         z.writestr(zipfile.ZipInfo("mimetype"), "application/epub+zip", compress_type=zipfile.ZIP_STORED)
         z.writestr("META-INF/container.xml", '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>', compress_type=zipfile.ZIP_DEFLATED)
@@ -235,14 +273,23 @@ def write_epub(path, meta, docs, images, cover_img, nav):
 def cover_doc(title):
     return page(title, '<div class="cover"><img src="img/cover.jpg" alt="%s"/></div>' % html.escape(title))
 
+def _font(weight, size):
+    """Lato when installed, else DejaVu (Pillow's search path, then Matplotlib's bundled copy)."""
+    from PIL import ImageFont
+    lato = "/usr/share/fonts/truetype/sand-box/google/Lato/Lato-%s.ttf" % weight
+    dejavu = "DejaVuSans.ttf" if weight == "Regular" else "DejaVuSans-Bold.ttf"
+    for cand in (lato, dejavu):
+        try: return ImageFont.truetype(cand, size)
+        except OSError: pass
+    import matplotlib
+    return ImageFont.truetype(os.path.join(matplotlib.get_data_path(), "fonts", "ttf", dejavu), size)
+
 def make_cover(path, kicker, title_lines, sub, foot, band="#000000", rule="#555555"):
     """1600x2560 JPEG. title_lines: 2-3 short lines (about 14 chars each at this size)."""
     from PIL import Image, ImageDraw, ImageFont
     W, H = 1600, 2560
     im = Image.new("RGB", (W, H), "white"); d = ImageDraw.Draw(im)
-    L = "/usr/share/fonts/truetype/sand-box/google/Lato/"  # swap for any TTF family if Lato is absent
-    fb = ImageFont.truetype(L + "Lato-Black.ttf", 150); fk = ImageFont.truetype(L + "Lato-Bold.ttf", 52)
-    fs = ImageFont.truetype(L + "Lato-Regular.ttf", 64); ff = ImageFont.truetype(L + "Lato-Bold.ttf", 54)
+    fb, fk, fs, ff = _font("Black", 150), _font("Bold", 52), _font("Regular", 64), _font("Bold", 54)
     d.rectangle([0, 0, W, 900], fill=band)
     d.text((120, 260), kicker, font=fk, fill="white")
     y = 1020
@@ -257,13 +304,30 @@ def make_cover(path, kicker, title_lines, sub, foot, band="#000000", rule="#5555
 
 
 def chapter_head(label, title, short=None, sections=None, short_title="The short version"):
-    """Standard chapter opener: kicker label, h1, 3-bullet summary box, in-chapter jump links."""
-    h = '<p class="label">%s</p>' % html.escape(label) if label else ""
-    h += "<h1>%s</h1>" % html.escape(title)
+    """Standard chapter opener: h1 holding the kicker label (the menu name) and the action title,
+    3-bullet summary box, and jump links. sections: (id or "file.xhtml", text) pairs."""
+    # The kicker sits inside the h1 so it is the chapter's menu name (epub_nav.heading_label).
+    kick = '<span class="label">%s</span>' % html.escape(label) if label else ""
+    h = "<h1>%s%s</h1>" % (kick, html.escape(title))
     if short:
         h += '<div class="short"><p class="short-t">%s</p><ul>%s</ul></div>' % (html.escape(short_title), "".join("<li>%s</li>" % html.escape(x) for x in short))
     if sections and len(sections) >= 2:
-        h += '<div class="inthis"><p><b>In this chapter</b></p>%s</div>' % "".join('<p><a href="#%s">%s</a></p>' % (a, html.escape(t)) for a, t in sections)
+        h += '<div class="inthis"><p><b>In this chapter</b></p>%s</div>' % "".join('<p><a href="%s">%s</a></p>' % (a if (".xhtml" in a or a.startswith("#")) else "#" + a, html.escape(t)) for a, t in sections)
     return h
 
 def next_link(href, title): return '<p class="next"><a href="%s">Next: %s</a></p>' % (href, html.escape(title))
+
+def section_head(label, hid=None):
+    """Short visible h2 for a section file (for example a chart page). It is the menu label."""
+    return '<h2 class="sec-h"%s>%s</h2>' % (' id="%s"' % hid if hid else "", html.escape(label))
+
+def contents_html(nav, label="Contents", title=None):
+    """Visible contents page body from a nav tree: chapters in bold, sections indented.
+    Do not list the contents page itself; the landmarks nav already links it."""
+    h = chapter_head(label if title else None, title or label)
+    for t, href, ch in nav:
+        h += '<p class="toc1"><a href="%s">%s</a></p>' % (href, html.escape(t))
+        for t2, href2, _ in ch:
+            h += '<p class="toc2"><a href="%s">%s</a></p>' % (href2, html.escape(t2))
+    return h
+

@@ -3,9 +3,10 @@ name: kindle-reading-kit
 description: >
   Design or redraw charts for Kindle and other grayscale e-readers. Trigger
   phrases include "make this chart readable on Kindle", "e-ink friendly chart",
-  and "grayscale chart for e-reader". Use for chart form, the focal series,
-  gray values, and short chart samples. For a full book or report conversion,
-  use kindle-edition. Also known as eink-chart-design.
+  "grayscale chart for e-reader", and "make this table readable on Kindle".
+  Use for chart form, the focal series, gray values, tables and dense data
+  next to charts, and short chart samples. For a full book or report
+  conversion, use kindle-edition. Also known as eink-chart-design.
 ---
 
 # kindle-reading-kit
@@ -72,7 +73,7 @@ separation, so spaced grays are a target, not a guarantee.
 | Type | Headlines 13-14 pt (about 54-58 px), labels 11 pt (about 46 px), subtitles 10.5 pt (about 44 px), sources and ticks at least 9.5 pt (about 40 px). At 758 px the minimum em is about 24 px. |
 | EPUB text | Relative `em` only. No font-family lock and no absolute font size. Raster chart fonts stay fixed. |
 
-## Forms and styles
+## Chart forms
 
 Caps are limits, not targets. Direct-label the focal mark. Comparisons use a dash
 or a marker as well as a gray. With more than 3 series, patterns are required and
@@ -90,6 +91,40 @@ No 3-D, dual axes, fine gradients, transparency-as-meaning, or decorative grids.
 Guides must help estimation. Push back on pies. If one is unavoidable, use at most
 3 directly labeled slices and say a ranked bar is usually clearer.
 
+## Tables and dense data
+
+Native text reflows when the reader changes the font size. Images do not. A table
+drawn as a picture stays the size it was drawn, cannot paginate, and cannot be
+read aloud, so values live in text and images carry patterns. Amazon's Kindle
+table guidance agrees: HTML over images, no paragraphs in cells, and single
+columns of text read best across font sizes. With Enhanced Typesetting, a table
+of more than 3 columns can open in a pan and zoom viewer, and wide tables can shrink.
+
+Ask what the reader does with the data: take one number, compare a ranking, look
+up one item, or see a pattern. Then walk this ladder and use the first rung that fits.
+
+1. **Prose.** At most 3 numbers in total. Write the sentence.
+2. **Ranked list.** One value per item. Ordered list sorted by the claim, focal item bold: `East: 1,702 (+9.1%)`.
+3. **Text table.** A label column plus at most 2 short value columns. Values at most 10 characters, labels at most 24, headers at most 14. Each row must still fit one line at 2x the default font size. Widths in % only. At most 12 rows per table; split longer ones and repeat the header.
+4. **Record cards.** Anything wider or wordier. One block per item: label and key value on the head line, then `Field: value` pairs that wrap as whole units. Cards reflow at every size.
+5. **Chart image.** Only when the pattern is the point, using the forms above. It is fixed, so keep its caps (8 bars, 4 sparkline rows), 9.5 pt minimum raster type, full width, and aspect at most 1.30. Alt text states the takeaway, and the values follow in rung 1 to 4 text. Never ship a screenshot of a grid.
+
+Rules for every rung:
+
+- Chart first, then the values behind it, at full width. Never set a table beside a chart. No floats.
+- Show only the columns the claim needs. Extra fields drop to record cards below the table.
+- Sort rows by the claim: descending on the focal metric, or time order for time. Bold the focal row, the same entity that is black in the chart.
+- Right-align numbers. Same decimals in a column, thousands separators, a sign on changes. Units go in the header (`Q3, k`) or the table title, not in every cell.
+- Abbreviate headers, then define every abbreviation in a key line directly under the table. Fields that appear only in the cards get their key line under the cards. Notes and footnotes go below the grid, never in a cell. The source line closes the section.
+- Grayscale only. Black rules under the header and at the bottom. No zebra fills, light gray rules, or color.
+- Preview at 1x and 2x font size. Text should reflow; the chart should stay one page.
+
+Repo helper: `scripts/kindle_tables.py` (`plan`, `render`, and the three HTML
+builders). Tier C writes the same HTML by hand and says it was not rendered.
+Width checks are estimates from average glyph widths, not a device measurement.
+
+## Styles
+
 One default plus four alternatives. Keep all five available.
 
 1. **Editorial Soft** (`editorial-soft`, default): 3.4 pt black focus, 1.5 pt gray context, 1.5 pt light guides, black top rule, compact sans titles.
@@ -97,6 +132,18 @@ One default plus four alternatives. Keep all five available.
 3. **Bold Highlight** (`bold-highlight`): 3.8 pt focal stroke, 14 pt titles, no top rule or guides.
 4. **Pattern & Texture** (`pattern-texture`): hatches on comparison bars and open markers on comparison trends. Focus stays solid black. Avoid moiré.
 5. **Economist-style Editorial** (`economist-editorial`): top rule, guides, 2 pt context strokes. Grammar only: no logo, trade dress, or claim of affiliation.
+
+## Chapters and contents
+
+Kindle builds its Go To menu and the chapter part of its progress display from the
+book's contents (the toc nav, or the NCX), and it shows two levels at most.
+
+- One chapter per topic, not one per chart. A chapter opens with an `h1`; each chart is a section with its own short visible `h2` (for example "Line") above the image.
+- Contents have two levels: chapters, then sections. Never deeper. `h3` stays out of the menu.
+- Every menu label is the heading text on that page. A chapter's short name is the kicker inside its `h1`.
+- A visible contents page sits near the front, after the opening page, with sections indented under chapters. It does not list itself; the landmarks nav links it for Go To.
+- The cover, the contents page, and the opening page are set as landmarks. Amazon may still choose where "Go to Beginning" lands.
+- Each chapter and section is its own file, so each starts on a new page.
 
 ## Handoff
 

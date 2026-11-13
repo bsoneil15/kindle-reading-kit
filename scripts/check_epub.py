@@ -6,7 +6,12 @@ Exits 2 when lxml is missing or no path was given. A skip is not a pass.
 The package document path comes from META-INF/container.xml (full-path).
 Kit EPUBs use OEBPS/content.opf. Other layouts work when the container names them.
 Checks: mimetype first, package and content XML parse, manifest files exist,
-every internal href/src and #anchor resolves.
+every internal href/src and #anchor resolves, and every <table> keeps the e-ink
+caps from kindle_tables.lint_table_html (at most 3 columns, no nesting, no fixed widths).
+Navigation (epub_nav.lint_nav): toc nav at most 2 levels, no duplicates, reading
+order matches the spine, every spine document except the cover and contents page
+has an entry, every label matches its heading, and the NCX mirrors the nav with
+the right dtb:depth.
 """
 import os
 import posixpath
@@ -16,6 +21,8 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from epub_paths import join_zip, package_opf_path
+from kindle_tables import lint_table_html
+from epub_nav import lint_nav
 
 
 def _load_lxml():
@@ -63,6 +70,9 @@ def _check_one(etree, path):
             etree.fromstring(text.encode("utf-8"))
         except Exception as exc:
             probs.append("parse %s: %s" % (name, exc))
+        else:
+            if name.endswith((".xhtml", ".html")):
+                probs.extend("%s: %s" % (name.split("/")[-1], p) for p in lint_table_html(text))
         ids[name] = set(re.findall(r'id="([^"]+)"', text))
     for name in docs:
         text = z.read(name).decode("utf-8", errors="replace")
@@ -81,6 +91,10 @@ def _check_one(etree, path):
                 continue
             if anchor and target in ids and anchor not in ids[target]:
                 probs.append("%s: broken link %s" % (label, href))
+    try:
+        probs.extend(lint_nav(z, opf_path, join_zip))
+    except Exception as exc:
+        probs.append("nav check failed: %s" % exc)
     return probs
 
 
