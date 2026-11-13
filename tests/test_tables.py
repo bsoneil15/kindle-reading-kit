@@ -62,6 +62,9 @@ def test_cards_and_list():
     html, p = kt.render(COLS, ROWS, show=["Region", "Q3, k", "YoY"], focal="East", sort_by="Q3, k",
                         notes=["k = thousand units."])
     assert p["form"] == "text-table" and html.index("<table") < html.index("kt-note") < html.index("kt-cards")
+    html, p = kt.render(COLS, ROWS, show=["Region", "Q3, k", "YoY"], focal="East", notes=["k = thousand units."],
+                        detail_notes=["Util = share of capacity."])
+    assert html.index("k = thousand") < html.index("kt-cards") < html.index("Util = share"), html
 
 
 def test_epub_integration(tmp):

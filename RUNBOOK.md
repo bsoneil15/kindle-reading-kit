@@ -106,14 +106,17 @@ print(plan["form"], plan["reasons"])  # text-table, then cards for Util
 `text_table_html()` raises `ValueError` when a table breaks a cap, so a wide
 table cannot slip through. `table_fit()` estimates the font scale where a row
 stops fitting one line (`LINE_EM` 26 em at the default size, an assumption from
-the preview page). Notes land under the table, where the short headers appear.
+the preview page). `notes` land under the table, where the short headers appear.
+`detail_notes` land under the record cards. Put the source line after both.
 
 `check_epub.py` flags any table with more than 3 columns, a nested table, or a
 fixed width. `examples/table_ladder.py` builds an after EPUB that passes and a
 before EPUB (7 columns floated beside the chart) that fails on purpose.
 
 Check reflow at two sizes. `--font-scale` multiplies the 9.5 pt base text; chart
-images keep their size, as on a Kindle:
+images keep their size, as on a Kindle. At 1.5 and above the preview sets text
+ragged right, imitating Kindle's documented fallback to left-aligned text at
+large sizes (the exact device threshold is not published):
 
 ```sh
 python examples/table_ladder.py --out output/tables

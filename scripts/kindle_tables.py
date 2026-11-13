@@ -49,7 +49,8 @@ table.kt-c3 .kt-n { width: 27%; }
 .kt-note { font-size: 0.85em; margin: 0 0 0.25em 0; }
 ol.kt-rank li.kt-f { font-weight: bold; }
 .kt-cards p, ol.kt-rank li, .kt-note { text-align: left; }
-.rec.kt-f { border-left: 6px solid #000; }
+.kt-cards .rec { border-left: 6px solid #999; }
+.kt-cards .rec.kt-f { border-left: 6px solid #000; }
 .rec.kt-f .rec-h { font-size: 1.05em; }
 """
 
@@ -268,8 +269,12 @@ def record_cards_html(columns, rows, title=None, focal=None, sort_by=None, desce
 
 
 def render(columns, rows, show=None, title=None, focal=None, sort_by=None, descending=True, notes=None,
-           detail_title=None, sentence=None, numeric=None):
-    """plan() then emit HTML. Returns (html, plan_dict). sentence is required for the prose form."""
+           detail_title=None, sentence=None, numeric=None, detail_notes=None):
+    """plan() then emit HTML. Returns (html, plan_dict). sentence is required for the prose form.
+
+    notes: key lines for the main form, placed directly under it. detail_notes: key
+    lines for fields that only appear in the record cards, placed under the cards.
+    Add the source line after the returned HTML so it closes the section."""
     p = plan(columns, rows, show=show, numeric=numeric)
     form, show = p["form"], p["show"]
     if form == "prose":
@@ -284,11 +289,11 @@ def render(columns, rows, show=None, title=None, focal=None, sort_by=None, desce
                               numeric=numeric, notes=notes)
         if p["details"]:
             out += record_cards_html([show[0]] + p["details"], rows, title=detail_title or "Other fields",
-                                     focal=focal, sort_by=sort_by, descending=descending)
+                                     focal=focal, sort_by=sort_by, descending=descending, notes=detail_notes)
         return out, p
     head = show[1] if len(show) > 1 else None
     return record_cards_html(columns, rows, title=title, focal=focal, sort_by=sort_by, descending=descending,
-                             head_value=head, notes=notes), p
+                             head_value=head, notes=(notes or []) + (detail_notes or [])), p
 
 
 def lint_table_html(markup):

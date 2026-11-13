@@ -28,8 +28,9 @@ ROWS = [dict(zip(COLUMNS, r)) for r in [
     ("Central", 870, 902, 944, "+8.5%", "44%", "pilot"),
 ]]
 TITLE = "East leads Q3 at 1,702 and grows fastest."
-NOTES = ["k = thousand units. YoY = Q3 change from Q3 last year. Util = share of site capacity used in Q3.",
-         SOURCE]
+HEADING = "Q3 volume across five regions"
+NOTES = ["k = thousand units. YoY = Q3 change from Q3 last year."]
+DETAIL_NOTES = ["Util = share of site capacity used in Q3."]
 
 
 def _cover(out, label):
@@ -39,13 +40,14 @@ def _cover(out, label):
 
 
 def build_after(out, chart):
-    body = '<p class="label">Tables and dense data</p><h1>%s</h1>' % html.escape(TITLE)
+    body = '<p class="label">Tables and dense data</p><h1>%s</h1>' % html.escape(HEADING)
     body += '<p class="lede">Chart first for the pattern. The values follow as text, so they reflow at any font size.</p>'
     fig = kit.figure_html(chart, alt=kit.text_fallback(chart))
     body += ep.to_xhtml(ep.generic(fig, ep.Notes("t"), {"img/" + Path(chart["path"]).name: fig}))
     table, plan = kt.render(COLUMNS, ROWS, show=["Region", "Q3, k", "YoY"], title="Q3 by region",
-                            focal="East", sort_by="Q3, k", notes=NOTES, detail_title="Other fields by region")
-    body += table
+                            focal="East", sort_by="Q3, k", notes=NOTES, detail_notes=DETAIL_NOTES,
+                            detail_title="Other fields by region")
+    body += table + '<p class="small">%s</p>' % html.escape(SOURCE)
     docs = [("cover.xhtml", "Cover", ep.page("Table ladder", '<h1>Table ladder: after</h1><p>Fictional data.</p>' + ep.next_link("data.xhtml", "Data"))),
             ("data.xhtml", "Q3 by region", ep.page(TITLE, ep.to_xhtml(body)))]
     path = out / "Table-Ladder-After.epub"

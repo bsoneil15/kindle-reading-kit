@@ -18,6 +18,7 @@ body { margin: 0; padding: 0; }
 a { color: #000; text-decoration: underline; }
 p { margin: 0 0 0.55em 0; text-indent: 0; line-height: 1.4; }
 .label { font-size: 0.78em; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 0.15em 0; }
+h1, h2, h3 { text-align: left; }
 h1 { font-size: 1.45em; line-height: 1.2; margin: 0 0 0.7em 0; page-break-after: avoid; }
 h2 { font-size: 1.2em; line-height: 1.25; margin: 1.5em 0 0.45em 0; page-break-after: avoid; }
 h3 { font-size: 1.05em; line-height: 1.25; margin: 1.3em 0 0.25em 0; page-break-after: avoid; }

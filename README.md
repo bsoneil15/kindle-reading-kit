@@ -8,8 +8,9 @@ alternatives stay selectable. This repo is for charts and short chart samples.
 A full book or report conversion belongs to kindle-edition.
 
 Trigger phrases include "make this chart readable on Kindle", "e-ink friendly
-chart", "grayscale chart for e-reader", and "make this table readable on Kindle". No personal details, network calls,
-accounts, proprietary fonts, repository setup, or email delivery are required.
+chart", "grayscale chart for e-reader", and "make this table readable on Kindle".
+No personal details, network calls, accounts, proprietary fonts, repository
+setup, or email delivery are required.
 Capability tiers (full shell, offline Python without pip or network, and no
 code) are in `SKILL.md`.
 

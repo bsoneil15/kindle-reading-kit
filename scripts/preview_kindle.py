@@ -189,6 +189,8 @@ def _prepare_outdir(outdir, force):
 def _section_css(start_page, font_scale=1.0):
     from weasyprint import CSS
     page_css = PAGE_CSS.replace("BASEpt", "%.2fpt" % (BASE_PT * font_scale))
+    if font_scale >= 1.5:  # Kindle falls back to left-aligned text at large sizes
+        page_css += "\nhtml, p, li { text-align: left !important; }\n"
     return CSS(string=page_css + "\n@page:first { counter-reset: page %d; }\n" % start_page)
 
 

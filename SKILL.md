@@ -73,7 +73,7 @@ separation, so spaced grays are a target, not a guarantee.
 | Type | Headlines 13-14 pt (about 54-58 px), labels 11 pt (about 46 px), subtitles 10.5 pt (about 44 px), sources and ticks at least 9.5 pt (about 40 px). At 758 px the minimum em is about 24 px. |
 | EPUB text | Relative `em` only. No font-family lock and no absolute font size. Raster chart fonts stay fixed. |
 
-## Forms and styles
+## Chart forms
 
 Caps are limits, not targets. Direct-label the focal mark. Comparisons use a dash
 or a marker as well as a gray. With more than 3 series, patterns are required and
@@ -98,10 +98,10 @@ drawn as a picture stays the size it was drawn, cannot paginate, and cannot be
 read aloud, so values live in text and images carry patterns. Amazon's Kindle
 table guidance agrees: HTML over images, no paragraphs in cells, and single
 columns of text read best across font sizes. With Enhanced Typesetting, a table
-of more than 3 columns opens a pan and zoom viewer, and wide tables can shrink.
+of more than 3 columns can open in a pan and zoom viewer, and wide tables can shrink.
 
 Ask what the reader does with the data: take one number, compare a ranking, look
-up one item, or see a pattern. Then use the first rung that fits.
+up one item, or see a pattern. Then walk this ladder and use the first rung that fits.
 
 1. **Prose.** At most 3 numbers in total. Write the sentence.
 2. **Ranked list.** One value per item. Ordered list sorted by the claim, focal item bold: `East: 1,702 (+9.1%)`.
@@ -114,8 +114,8 @@ Rules for every rung:
 - Chart first, then the values behind it, at full width. Never set a table beside a chart. No floats.
 - Show only the columns the claim needs. Extra fields drop to record cards below the table.
 - Sort rows by the claim: descending on the focal metric, or time order for time. Bold the focal row, the same entity that is black in the chart.
-- Right-align numbers. Same decimals in a column, thousands separators, a sign on changes. Units go in the header (`Q3, k`), not in every cell.
-- Abbreviate headers, then define every abbreviation in a key line directly under the table. Notes and footnotes go below the grid, never in a cell.
+- Right-align numbers. Same decimals in a column, thousands separators, a sign on changes. Units go in the header (`Q3, k`) or the table title, not in every cell.
+- Abbreviate headers, then define every abbreviation in a key line directly under the table. Fields that appear only in the cards get their key line under the cards. Notes and footnotes go below the grid, never in a cell. The source line closes the section.
 - Grayscale only. Black rules under the header and at the bottom. No zebra fills, light gray rules, or color.
 - Preview at 1x and 2x font size. Text should reflow; the chart should stay one page.
 
